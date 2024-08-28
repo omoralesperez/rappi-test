@@ -109,6 +109,13 @@ def download_files_func():
     download_and_extract_files('megelon/meetup')
     
 
+@aql.dataframe(task_id="exe_sp_load_stage_data")
+def exe_sp_load_stage_data_func():
+    conn = BaseHook.get_connection('cnn_snow_rappi_stage')
+    sql="CALL LOAD_STAGE_DATA();"
+    hook = conn.get_hook()
+    hook.run(sql)
+
 default_args={
     "owner": "oscar andres morales perez,Open in Cloud IDE",
 }
@@ -125,5 +132,9 @@ default_args={
 )
 def dwh_meetup_rappi():
     download_files = download_files_func()
+
+    exe_sp_load_stage_data = exe_sp_load_stage_data_func()
+
+    exe_sp_load_stage_data << download_files
 
 dag_obj = dwh_meetup_rappi()
