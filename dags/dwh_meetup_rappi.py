@@ -116,6 +116,44 @@ def exe_sp_load_stage_data_func():
     hook = conn.get_hook()
     hook.run(sql)
 
+@aql.dataframe(task_id="unload_bucket_s3")
+def unload_bucket_s3_func():
+    snowflake_hook = SnowflakeHook(snowflake_conn_id='cnn_snow_rappi')
+    s3_hook = S3Hook(aws_conn_id='cnn_s3_bucket_rappi')
+    conn = snowflake_hook.get_conn()
+    cursor = conn.cursor()
+    
+    # Obtener las credenciales temporales desde S3Hook
+    credentials = s3_hook.get_credentials()
+    aws_access_key_id = credentials.access_key
+    aws_secret_access_key = credentials.secret_key
+    aws_session_token = credentials.token
+    
+    # Define el SQL de UNLOAD para Snowflake
+    unload_sql = f"""
+    COPY INTO 's3://buckets3-rappi-test/data_output/dim_categoria.csv'
+    FROM (
+        SELECT * FROM DIM_CATEGORIES
+    )
+    CREDENTIALS = (
+        AWS_KEY_ID='{aws_access_key_id}'
+        AWS_SECRET_KEY='{aws_secret_access_key}'
+        
+    )
+    FILE_FORMAT = (FORMAT_NAME = 's3_csv_format')
+    HEADER = TRUE
+    OVERWRITE = TRUE;
+    """
+    
+    try:
+        cursor.execute(unload_sql)
+        logging.info("Data successfully unloaded to S3")
+    except Exception as e:
+        logging.error(f"Error while unloading data to S3: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
 default_args={
     "owner": "oscar andres morales perez,Open in Cloud IDE",
 }
@@ -135,6 +173,10 @@ def dwh_meetup_rappi():
 
     exe_sp_load_stage_data = exe_sp_load_stage_data_func()
 
+    unload_bucket_s3 = unload_bucket_s3_func()
+
     exe_sp_load_stage_data << download_files
+
+    unload_bucket_s3 << exe_sp_load_stage_data
 
 dag_obj = dwh_meetup_rappi()
