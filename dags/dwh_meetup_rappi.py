@@ -96,18 +96,43 @@ def list_dir_func():
     
     entries_info = []
     
+    # Configuración básica del logging
+    logging.basicConfig(level=logging.INFO)
+    
+    # Validar si el directorio existe
+    if not os.path.exists(directory):
+        error_message = f"Error: El directorio '{directory}' no existe."
+        logging.error(error_message)
+        return error_message
+    
+    # Validar si el directorio es realmente una carpeta
+    if not os.path.isdir(directory):
+        error_message = f"Error: La ruta '{directory}' no es un directorio."
+        logging.error(error_message)
+        return error_message
+    
+    entries_info = []
+    
+    # Listar archivos y directorios
     with os.scandir(directory) as entries:
-            for entry in entries:
-                if entry.is_dir():
-                    entry_info = f'Directory: {entry.name}'
-                elif entry.is_file():
-                    entry_info = f'File: {entry.name}'
-                
-                entries_info.append(entry_info)
-                logging.info(entry_info)
-                print(entry_info)
-        # Join the list into a single string with newline characters
+        for entry in entries:
+            if entry.is_dir():
+                entry_info = f'Directory: {entry.name}'
+            elif entry.is_file():
+                entry_info = f'File: {entry.name}'
+            
+            entries_info.append(entry_info)
+            logging.info(entry_info)
+    
+    # Verificar si la carpeta está vacía
+    if not entries_info:
+        empty_message = f"El directorio '{directory}' está vacío."
+        logging.info(empty_message)
+        return empty_message
+    
+    # Join the list into a single string with newline characters
     return '\n'.join(entries_info)
+    
     
     
     
