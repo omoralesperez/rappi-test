@@ -19,10 +19,7 @@ import tempfile
 
 @aql.dataframe(task_id="download_files")
 def download_files_func():
-    import os
-    import logging
-    import zipfile
-    from kaggle.api.kaggle_api_extended import KaggleApi
+    
     
     def download_and_extract_files(dataset, download_path='/tmp'):
         try:
@@ -89,37 +86,19 @@ def download_files_func():
     print("Archivos descargados:", downloaded_files)
     return downloaded_files
 
-@aql.dataframe(task_id="python_1")
-def python_1_func(download_files: pd.DataFrame):
-    def upload_files_to_snowflake(files_list, stage_name):
-        try:
-            # Obtener la conexión a Snowflake desde Airflow
-            conn = BaseHook.get_connection('cnn_snow_rappi_stage')
-            hook = conn.get_hook()
+@aql.dataframe(task_id="list_dir")
+def list_dir_func():
+    directory ='/tmp'
     
-            # Subir cada archivo al stage en Snowflake
-            for file_path in files_list:
-                logging.info(f"Subiendo el archivo {file_path} a Snowflake en el stage {stage_name}")
+    with os.scandir(directory) as entries:
+            for entry in entries:
+                if entry.is_dir():
+                    logging.info(f'Directory: {entry.name}')
+                elif entry.is_file():
+                    logging.info(f'File: {entry.name}')
     
-                # Construir el comando PUT para Snowflake
-                sql = f"PUT 'file://{file_path}' @{stage_name} AUTO_COMPRESS=FALSE"
     
-                # Ejecutar el comando PUT en Snowflake
-                hook.run(sql)
     
-                logging.info(f"El archivo {file_path} se subió correctamente a Snowflake en el stage {stage_name}")
-    
-                # Eliminar el archivo temporal después de la subida
-                os.remove(file_path)
-                logging.info(f"El archivo temporal {file_path} ha sido eliminado después de la carga.")
-    
-        except Exception as e:
-            logging.error(f"Error al subir los archivos a Snowflake: {e}")
-            raise  # Esto detendrá el proceso y permitirá que Airflow gestione el error
-    
-    # Ejemplo de uso con la lista de archivos descargados
-    
-    upload_files_to_snowflake(download_files, 'stage_test_rappi/DATA_INPUT')
 
 default_args={
     "owner": "oscar andres morales perez,Open in Cloud IDE",
@@ -138,8 +117,8 @@ default_args={
 def dwh_meetup_rappi():
     download_files = download_files_func()
 
-    python_1 = python_1_func(
-        download_files,
-    )
+    list_dir = list_dir_func()
+
+    list_dir << download_files
 
 dag_obj = dwh_meetup_rappi()
