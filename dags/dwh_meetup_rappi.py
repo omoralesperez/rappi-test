@@ -19,7 +19,10 @@ import tempfile
 
 @aql.dataframe(task_id="download_files")
 def download_files_func():
-    
+    import os
+    import logging
+    import zipfile
+    from kaggle.api.kaggle_api_extended import KaggleApi
     
     def download_and_extract_files(dataset, download_path='/tmp'):
         try:
@@ -89,13 +92,22 @@ def download_files_func():
 @aql.dataframe(task_id="list_dir")
 def list_dir_func():
     directory ='/tmp'
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    
+    entries_info = []
     
     with os.scandir(directory) as entries:
             for entry in entries:
                 if entry.is_dir():
-                    logging.info(f'Directory: {entry.name}')
+                    entry_info = f'Directory: {entry.name}'
                 elif entry.is_file():
-                    logging.info(f'File: {entry.name}')
+                    entry_info = f'File: {entry.name}'
+                
+                entries_info.append(entry_info)
+                logging.info(entry_info)
+                print(entry_info)
+        # Join the list into a single string with newline characters
+    return '\n'.join(entries_info)
     
     
     
