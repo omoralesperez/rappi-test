@@ -17,12 +17,12 @@ from airflow.hooks.base import BaseHook
 import zipfile
 import tempfile
 
-@aql.dataframe(task_id="download_files")
-def download_files_func():
+@aql.dataframe(task_id="extract_kaggle")
+def extract_kaggle_func():
     
     def upload_files_to_snowflake(files_list, stage_name):
         try:
-            # Obtener la conexión a Snowflake desde Airflow
+            
             conn = BaseHook.get_connection('cnn_snow_rappi_stage')
             hook = conn.get_hook()
     
@@ -30,34 +30,34 @@ def download_files_func():
             for file_path in files_list:
                 logging.info(f"Subiendo el archivo {file_path} a Snowflake en el stage {stage_name}")
     
-                # Construir el comando PUT para Snowflake
+                
                 sql = f"PUT 'file://{file_path}' @{stage_name} AUTO_COMPRESS=FALSE"
     
-                # Ejecutar el comando PUT en Snowflake
+                
                 hook.run(sql)
     
                 logging.info(f"El archivo {file_path} se subió correctamente a Snowflake en el stage {stage_name}")
     
-                # Eliminar el archivo temporal después de la subida
+                
                 os.remove(file_path)
                 logging.info(f"El archivo temporal {file_path} ha sido eliminado después de la carga.")
     
         except Exception as e:
             logging.error(f"Error al subir los archivos a Snowflake: {e}")
-            raise  # Esto detendrá el proceso y permitirá que Airflow gestione el error
+            raise  
     
     # Ejemplo de uso
     
     def download_and_extract_files(dataset, download_path='/tmp', stage_name='stage_test_rappi/DATA_INPUT'):
         try:
-            # Configuración de logging
+            
             logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     
-            # Autenticación con la API de Kaggle
+            # Autenticación Kaggle
             api = KaggleApi()
             api.authenticate()
     
-            # Listar todos los archivos del dataset
+            
             files = api.dataset_list_files(dataset).files
             logging.info(f"Archivos encontrados en el dataset {dataset}: {[file.name for file in files]}")
     
@@ -65,7 +65,7 @@ def download_files_func():
             for file in files:
                 file_name = file.name
                 
-                # Excluir el archivo members.csv
+                
                 if file_name == 'members.csv':
                     logging.info(f"El archivo {file_name} ha sido excluido de la descarga.")
                     continue
@@ -83,18 +83,18 @@ def download_files_func():
                         zip_ref.extractall(download_path)
                     logging.info(f"El archivo {zip_file_path} se descomprimió correctamente.")
     
-                    # Eliminar el archivo ZIP después de la descompresión
+                    
                     os.remove(zip_file_path)
                     logging.info(f"El archivo ZIP {zip_file_path} se eliminó después de descomprimirlo.")
     
                     # Subir el archivo CSV descomprimido a Snowflake
                     upload_files_to_snowflake([csv_file_path], stage_name)
     
-                # Si ya se descargó como CSV directamente
+                
                 elif os.path.exists(csv_file_path):
                     logging.info(f"El archivo {file_name} se descargó correctamente en {csv_file_path}")
                     
-                    # Subir el archivo CSV descargado a Snowflake
+                    
                     upload_files_to_snowflake([csv_file_path], stage_name)
     
                 else:
@@ -109,15 +109,233 @@ def download_files_func():
     download_and_extract_files('megelon/meetup')
     
 
-@aql.dataframe(task_id="exe_sp_load_stage_data")
-def exe_sp_load_stage_data_func():
-    conn = BaseHook.get_connection('cnn_snow_rappi_stage')
-    sql="CALL LOAD_STAGE_DATA();"
-    hook = conn.get_hook()
-    hook.run(sql)
+@aql.dataframe(task_id="extract_load_stage_data")
+def extract_load_stage_data_func():
+    try:
+        # Obtener la conexión de Airflow
+        conn = BaseHook.get_connection('cnn_snow_rappi_stage')
+        logging.info("Conexión obtenida correctamente.")
+    
+      
+        sql = "CALL LOAD_STAGE_DATA();"
+        logging.info(f"Ejecutando SQL: {sql}")
+    
+        # Obtener el hook de la conexión
+        hook = conn.get_hook()
+    
+        # Ejecutar el procedimiento almacenado
+        hook.run(sql)
+        logging.info("Procedimiento almacenado ejecutado con éxito.")
+    
+    except Exception as e:
+      
+        logging.error(f"Error al ejecutar el procedimiento almacenado: {e}")
+    
+        raise
 
-@aql.dataframe(task_id="unload_bucket_s3")
-def unload_bucket_s3_func():
+@aql.dataframe(task_id="transform_temp_fct")
+def transform_temp_fct_func():
+    try:
+        # Obtener la conexión de Airflow
+        conn = BaseHook.get_connection('cnn_snow_rappi_stage')
+        logging.info("Conexión obtenida correctamente.")
+    
+      
+        sql = """
+                INSERT INTO STAGE_DB.STAGE_SCHEMA.TEMP_FCT_MEETUP
+        (
+            group_id, 
+            group_name, 
+            group_description, 
+            created,
+            organizer_member_id, 
+            organizer_name,
+            city_id, 
+            city,
+            event_id, 
+            event_name,
+            category_id, 
+            category_name,
+            main_topic_id, 
+            topic_name,
+            members,
+            rating,
+            duration,
+            id_lote
+        )
+        SELECT 
+            g.group_id, 
+            g.group_name, 
+            g.description as group_description, 
+            g.created,
+            g.organizer_member_id, 
+            g.organizer_name,
+            c.city_id, 
+            c.city,
+            e.event_id, 
+            e.event_name,
+            ct.category_id, 
+            ct.category_name,
+            tp.main_topic_id, 
+            tp.topic_name,
+            g.members, 
+            g.rating,
+            e.duration,
+            (select max(l.id_lote) + 1 from  "STAGE_DB"."STAGE_SCHEMA".temp_lote l) id_lote
+        FROM 
+            stage_db.stage_schema.temp_groups g
+        INNER JOIN 
+            stage_db.stage_schema.temp_events e 
+            ON g.group_id = e.group_id
+        INNER JOIN 
+            stage_db.stage_schema.temp_cities c 
+            ON g.city_id = c.city_id
+        INNER JOIN 
+            stage_db.stage_schema.temp_categories ct 
+            ON g.category_id = ct.category_id
+        INNER JOIN 
+            stage_db.stage_schema.temp_groups_topics gt 
+            ON g.group_id = gt.group_id
+        INNER JOIN 
+            stage_db.stage_schema.temp_topics tp 
+            ON gt.topic_id = tp.topic_id
+        where cast(e.created as date) <= (select DATEADD('YEAR', 1, LAST_DAY(max(l.periodo), 'YEAR')) from  "STAGE_DB"."STAGE_SCHEMA".temp_lote l) ;
+    
+        """
+        logging.info(f"Ejecutando insert a tabla de hechos de stage")
+    
+     
+        hook = conn.get_hook()
+    
+        # Ejecutar sentencia
+        hook.run(sql)
+        logging.info("Sentencia ejecutada con éxito.")
+    
+    except Exception as e:
+      
+        logging.error(f"Error al ejecutar el procedimiento almacenado: {e}")
+    
+        raise
+
+@aql.dataframe(task_id="load_fct_meetup")
+def load_fct_meetup_func():
+    try:
+        # Obtener la conexión de Airflow
+        conn = BaseHook.get_connection('cnn_snow_rappi_stage')
+        logging.info("Conexión obtenida correctamente.")
+    
+      
+        sql = """
+    
+            MERGE INTO "RAPPI_TEST_DB"."RAPPI_TEST_SCHEMA"."FCT_MEETUP" AS target
+        USING (
+            SELECT 
+                group_id, 
+                group_name, 
+                group_description, 
+                created,
+                organizer_member_id, 
+                organizer_name,
+                city_id, 
+                city,
+                event_id, 
+                event_name,
+                category_id, 
+                category_name,
+                main_topic_id, 
+                topic_name,
+                members, 
+                rating,
+                duration,
+                id_lote
+            FROM "STAGE_DB"."STAGE_SCHEMA"."TEMP_FCT_MEETUP"
+            group by all
+        ) AS source
+        ON 
+            target.event_id = source.event_id AND
+            target.category_id = source.category_id AND
+            target.topic_name = source.topic_name AND
+            target.city_id = source.city_id AND
+            target.group_id = source.group_id
+        WHEN MATCHED THEN
+            UPDATE SET 
+                target.group_id = source.group_id,
+                target.group_name = source.group_name,
+                target.group_description = source.group_description,
+                target.created = source.created,
+                target.organizer_member_id = source.organizer_member_id,
+                target.organizer_name = source.organizer_name,
+                target.city = source.city,
+                target.event_name = source.event_name,
+                target.category_name = source.category_name,
+                target.topic_name = source.topic_name,
+                target.members = source.members,
+                target.rating = source.rating,
+                target.duration = source.duration,
+                target.id_lote = source.id_lote
+        WHEN NOT MATCHED THEN
+            INSERT (
+                group_id, 
+                group_name, 
+                group_description, 
+                created,
+                organizer_member_id, 
+                organizer_name,
+                city_id, 
+                city,
+                event_id, 
+                event_name,
+                category_id, 
+                category_name,
+                main_topic_id, 
+                topic_name,
+                members, 
+                rating,
+                duration,
+                id_lote
+            ) 
+            VALUES (
+                source.group_id, 
+                source.group_name, 
+                source.group_description, 
+                source.created,
+                source.organizer_member_id, 
+                source.organizer_name,
+                source.city_id, 
+                source.city,
+                source.event_id, 
+                source.event_name,
+                source.category_id, 
+                source.category_name,
+                source.main_topic_id, 
+                source.topic_name,
+                source.members, 
+                source.rating,
+                source.duration,
+                source.id_lote
+            );
+    
+            """
+        logging.info(f"Ejecutando Sentencia Merge a tabla de hechos")
+    
+     
+        hook = conn.get_hook()
+    
+        # Ejecutar sentencia
+        hook.run(sql)
+        logging.info("Sentencia merge ejecutada con éxito.")
+    
+    
+    
+    
+    except Exception as e:
+      
+        logging.error(f"Error al ejecutar sentencias sql: {e}")
+    
+        raise
+
+@aql.dataframe(task_id="load_unload_bucket_s3")
+def load_unload_bucket_s3_func():
     snowflake_hook = SnowflakeHook(snowflake_conn_id='cnn_snow_rappi')
     s3_hook = S3Hook(aws_conn_id='cnn_s3_bucket_rappi')
     conn = snowflake_hook.get_conn()
@@ -131,9 +349,9 @@ def unload_bucket_s3_func():
     
     # Define el SQL de UNLOAD para Snowflake
     unload_sql = f"""
-    COPY INTO 's3://buckets3-rappi-test/data_output/dim_categoria.csv'
+    COPY INTO 's3://buckets3-rappi-test/data_output/fct_meet.csv'
     FROM (
-        SELECT * FROM DIM_CATEGORIES
+        SELECT * FROM FCT_MEETUP
     )
     CREDENTIALS = (
         AWS_KEY_ID='{aws_access_key_id}'
@@ -154,6 +372,55 @@ def unload_bucket_s3_func():
         cursor.close()
         conn.close()
 
+@aql.dataframe(task_id="truncate_temps")
+def truncate_temps_func():
+    try:
+        # Obtener la conexión de Airflow
+        conn = BaseHook.get_connection('cnn_snow_rappi_stage')
+        logging.info("Conexión obtenida correctamente.")
+    
+        # insertando dato a lote
+    
+        sql = """
+    
+        INSERT INTO "STAGE_DB"."STAGE_SCHEMA".temp_lote (periodo)
+        SELECT 
+            DATEADD('YEAR', 1, MAX(l.periodo))
+        FROM 
+            "STAGE_DB"."STAGE_SCHEMA".temp_lote l;
+    
+        """
+        logging.info(f"Ejecutando SQL insert al lote: {sql}")
+    
+     
+        hook = conn.get_hook()
+    
+        
+        hook.run(sql)
+        logging.info("Sentencia insert al lote ejecutada con éxito.")
+    
+        ### borrando tablas temporales
+    
+        sql= """
+        
+        truncate table  STAGE_DB.STAGE_SCHEMA.TEMP_FCT_MEETUP
+        
+        """
+        logging.info(f"Borrando tabla tem_fct_meetup: {sql}")
+    
+     
+        hook = conn.get_hook()
+    
+        
+        hook.run(sql)
+        logging.info("Sentencia ejecutada con éxito.")
+    
+    except Exception as e:
+      
+        logging.error(f"Error al ejecutar sentencias sql: {e}")
+    
+        raise
+
 default_args={
     "owner": "oscar andres morales perez,Open in Cloud IDE",
 }
@@ -169,14 +436,26 @@ default_args={
     },
 )
 def dwh_meetup_rappi():
-    download_files = download_files_func()
+    extract_kaggle = extract_kaggle_func()
 
-    exe_sp_load_stage_data = exe_sp_load_stage_data_func()
+    extract_load_stage_data = extract_load_stage_data_func()
 
-    unload_bucket_s3 = unload_bucket_s3_func()
+    transform_temp_fct = transform_temp_fct_func()
 
-    exe_sp_load_stage_data << download_files
+    load_fct_meetup = load_fct_meetup_func()
 
-    unload_bucket_s3 << exe_sp_load_stage_data
+    load_unload_bucket_s3 = load_unload_bucket_s3_func()
+
+    truncate_temps = truncate_temps_func()
+
+    extract_load_stage_data << extract_kaggle
+
+    load_fct_meetup << transform_temp_fct
+
+    load_unload_bucket_s3 << load_fct_meetup
+
+    transform_temp_fct << extract_load_stage_data
+
+    truncate_temps << load_fct_meetup
 
 dag_obj = dwh_meetup_rappi()
