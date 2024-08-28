@@ -105,7 +105,7 @@ def list_dir_func():
                 
                 entries_info.append(entry_info)
                 logging.info(entry_info)
-    
+                print(entry_info)
         # Join the list into a single string with newline characters
     return '\n'.join(entries_info)
     
