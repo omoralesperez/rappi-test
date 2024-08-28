@@ -427,7 +427,7 @@ default_args={
 
 @dag(
     default_args=default_args,
-    schedule="0 0 * * *",
+    schedule="*/15 * * * *",
     start_date=pendulum.from_format("2024-08-27", "YYYY-MM-DD").in_tz("UTC"),
     catchup=False,
     owner_links={
