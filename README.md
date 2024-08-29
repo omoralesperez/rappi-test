@@ -15,7 +15,7 @@ airflow_settings.yaml:archivo para especificar Conexiones
 Desplegar Proyecto
 ===========================
 
-Se incluye sentences.sql y sp.sql para la creación de tablas y puesta en marcha del proyecto.
+Se incluye sentences.sql para la creación de tablas y puesta en marcha del proyecto.
 Es necesario crear las conexiones a snowflake y S3 dentro de airflow.
 Cargar variables de entorno para conexión a api KAggle
 
