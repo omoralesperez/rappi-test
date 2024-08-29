@@ -1,46 +1,25 @@
-Overview
+Prueba Técnica Data Engineer
 ========
 
-Welcome to Astronomer! This project was generated after you ran 'astro dev init' using the Astronomer CLI. This readme describes the contents of the project, as well as how to run Apache Airflow on your local machine.
+Este proyecto fue generado desde el IDE Astronomer cloud y GiTHubActions para prueba técnica Data Engineer 
 
-Project Contents
-================
+Contenido del Proyecto
+===========================
+El proyecto contiene los siguientes archivos y carpetas:
 
-Your Astro project contains the following files and folders:
+dags: Esta carpeta contiene el archiv principal de la prueba donde se realiza DAG con las acciones especificadas
+Dockerfile: Este archivo contiene una imagen Docker versionada de Astro Runtime.
+requirements.txt: Instala paquetes Python necesarios para tu proyecto agregándolos a este archivo.
+airflow_settings.yaml:archivo para especificar Conexiones
 
-- dags: This folder contains the Python files for your Airflow DAGs. By default, this directory includes an example DAG that runs every 30 minutes and simply prints the current date. It also includes an empty 'my_custom_function' that you can fill out to execute Python code.
-- Dockerfile: This file contains a versioned Astro Runtime Docker image that provides a differentiated Airflow experience. If you want to execute other commands or overrides at runtime, specify them here.
-- include: This folder contains any additional files that you want to include as part of your project. It is empty by default.
-- packages.txt: Install OS-level packages needed for your project by adding them to this file. It is empty by default.
-- requirements.txt: Install Python packages needed for your project by adding them to this file. It is empty by default.
-- plugins: Add custom or community plugins for your project to this file. It is empty by default.
-- airflow_settings.yaml: Use this local-only file to specify Airflow Connections, Variables, and Pools instead of entering them in the Airflow UI as you develop DAGs in this project.
-
-Deploy Your Project Locally
+Desplegar Proyecto
 ===========================
 
-1. Start Airflow on your local machine by running 'astro dev start'.
-
-This command will spin up 3 Docker containers on your machine, each for a different Airflow component:
-
-- Postgres: Airflow's Metadata Database
-- Webserver: The Airflow component responsible for rendering the Airflow UI
-- Scheduler: The Airflow component responsible for monitoring and triggering tasks
-
-2. Verify that all 3 Docker containers were created by running 'docker ps'.
-
-Note: Running 'astro dev start' will start your project with the Airflow Webserver exposed at port 8080 and Postgres exposed at port 5432. If you already have either of those ports allocated, you can either stop your existing Docker containers or change the port.
-
-3. Access the Airflow UI for your local Airflow project. To do so, go to http://localhost:8080/ and log in with 'admin' for both your Username and Password.
-
-You should also be able to access your Postgres Database at 'localhost:5432/postgres'.
-
-Deploy Your Project to Astronomer
-=================================
-
-If you have an Astronomer account, pushing code to a Deployment on Astronomer is simple. For deploying instructions, refer to Astronomer documentation: https://astronomer.io/docs/astro/deploy-code/
+Se incluye sentences.sql y sp.sql para la creación de tablas y puesta en marcha del proyecto.
+Es necesario crear las conexiones a snowflake y S3 dentro de airflow.
+Cargar variables de entorno para conexión a api KAggle
 
 Contact
 =======
 
-The Astronomer CLI is maintained with love by the Astronomer team. To report a bug or suggest a change, reach out to our support team: https://support.astronomer.io/
+Cualquier inquietud ponerse en contacto, 
